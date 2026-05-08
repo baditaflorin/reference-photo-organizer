@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/reference-photo-organizer/sw.js', { scope: '/reference-photo-organizer/' })})}

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Reference Photo Organizer">
+  <rect width="64" height="64" rx="14" fill="#f5f2ea"/>
+  <path d="M13 18h38v28H13z" fill="#23211d"/>
+  <path d="M17 22h15v11H17z" fill="#cf9b45"/>
+  <path d="M35 22h12v20H35z" fill="#426a75"/>
+  <path d="M17 36h15v6H17z" fill="#9d6b53"/>
+  <path d="M13 49h10v4H13zm14 0h10v4H27zm14 0h10v4H41z" fill="#50624b"/>
+</svg>
