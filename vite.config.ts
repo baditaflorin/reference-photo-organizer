@@ -14,7 +14,9 @@ function readCommit() {
   }
 
   try {
-    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
   } catch {
     return 'local';
   }
@@ -26,8 +28,8 @@ export default defineConfig({
   base,
   build: {
     outDir: 'docs',
-    emptyOutDir: true,
-    sourcemap: true,
+    emptyOutDir: false,
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks: {
@@ -91,6 +93,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    include: ['src/**/*.test.{ts,tsx}'],
+    exclude: ['e2e/**', 'node_modules/**', 'docs/**'],
     setupFiles: []
   }
 });

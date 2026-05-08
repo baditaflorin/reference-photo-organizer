@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760" role="img" aria-label="Reference Photo Organizer screenshot">
+  <rect width="1280" height="760" fill="#f5f2ea"/>
+  <rect x="28" y="24" width="1224" height="62" rx="8" fill="#fffaf0" stroke="#ded5c3"/>
+  <text x="54" y="61" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#23211d">Artist reference workspace</text>
+  <rect x="1038" y="38" width="92" height="30" rx="4" fill="#23211d"/>
+  <text x="1054" y="58" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#fffaf0">Star repo</text>
+  <rect x="1142" y="38" width="86" height="30" rx="4" fill="#50624b"/>
+  <text x="1159" y="58" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#fffaf0">v0.1.0</text>
+  <rect x="28" y="110" width="274" height="210" rx="8" fill="#fffaf0" stroke="#ded5c3"/>
+  <rect x="54" y="138" width="44" height="44" rx="6" fill="#23211d"/>
+  <text x="116" y="160" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#23211d">Drop image folder</text>
+  <text x="116" y="182" font-family="Arial, sans-serif" font-size="13" fill="#5b554b">Local files stay in this browser.</text>
+  <rect x="54" y="230" width="98" height="36" rx="4" fill="#23211d"/>
+  <rect x="162" y="230" width="98" height="36" rx="4" fill="#f5f2ea" stroke="#ded5c3"/>
+  <rect x="326" y="110" width="626" height="54" rx="8" fill="#fffaf0" stroke="#ded5c3"/>
+  <rect x="348" y="124" width="262" height="28" rx="4" fill="#f5f2ea" stroke="#ded5c3"/>
+  <rect x="620" y="124" width="154" height="28" rx="4" fill="#f5f2ea" stroke="#ded5c3"/>
+  <rect x="848" y="124" width="82" height="28" rx="4" fill="#23211d"/>
+  <rect x="326" y="186" width="626" height="532" rx="8" fill="#eee8da" stroke="#ded5c3"/>
+  <g transform="translate(350 210)">
+    <rect width="172" height="218" rx="8" fill="#fffaf0"/>
+    <rect width="172" height="138" rx="8" fill="#c99058"/>
+    <circle cx="86" cy="52" r="33" fill="#5d3f35"/>
+    <path d="M45 138c10-56 27-84 42-84s33 28 42 84z" fill="#23342d"/>
+    <rect y="138" width="43" height="12" fill="#5d3f35"/>
+    <rect x="43" y="138" width="43" height="12" fill="#c99058"/>
+    <rect x="86" y="138" width="43" height="12" fill="#23342d"/>
+    <rect x="129" y="138" width="43" height="12" fill="#cf9b45"/>
+  </g>
+  <g transform="translate(546 210)">
+    <rect width="172" height="170" rx="8" fill="#fffaf0"/>
+    <rect width="172" height="108" rx="8" fill="#9bb7bd"/>
+    <rect y="54" width="172" height="54" fill="#29393d"/>
+    <rect x="28" y="35" width="30" height="73" fill="#526f77"/>
+    <rect x="74" y="22" width="38" height="86" fill="#314e57"/>
+    <rect x="128" y="42" width="28" height="66" fill="#6f858b"/>
+    <rect y="108" width="43" height="12" fill="#9bb7bd"/>
+    <rect x="43" y="108" width="43" height="12" fill="#29393d"/>
+    <rect x="86" y="108" width="43" height="12" fill="#426a75"/>
+    <rect x="129" y="108" width="43" height="12" fill="#cf9b45"/>
+  </g>
+  <g transform="translate(742 210)">
+    <rect width="172" height="205" rx="8" fill="#fffaf0"/>
+    <rect width="172" height="128" rx="8" fill="#d7c68f"/>
+    <path d="M24 128 52 16l34 112z" fill="#33472e"/>
+    <path d="M78 128 108 9l38 119z" fill="#50624b"/>
+    <circle cx="138" cy="28" r="15" fill="#fff0a7"/>
+    <rect y="128" width="43" height="12" fill="#d7c68f"/>
+    <rect x="43" y="128" width="43" height="12" fill="#50624b"/>
+    <rect x="86" y="128" width="43" height="12" fill="#33472e"/>
+    <rect x="129" y="128" width="43" height="12" fill="#7b6d3f"/>
+  </g>
+  <rect x="976" y="110" width="276" height="200" rx="8" fill="#fffaf0" stroke="#ded5c3"/>
+  <text x="1002" y="144" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#23211d">Library</text>
+  <rect x="1002" y="170" width="62" height="54" rx="5" fill="#f5f2ea" stroke="#ded5c3"/>
+  <rect x="1080" y="170" width="62" height="54" rx="5" fill="#f5f2ea" stroke="#ded5c3"/>
+  <rect x="1158" y="170" width="62" height="54" rx="5" fill="#f5f2ea" stroke="#ded5c3"/>
+  <text x="1024" y="203" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#23211d">6</text>
+  <text x="1100" y="203" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#23211d">6</text>
+  <text x="1179" y="203" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#23211d">0</text>
+  <rect x="976" y="330" width="276" height="252" rx="8" fill="#fffaf0" stroke="#ded5c3"/>
+  <text x="1002" y="364" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#23211d">Tags</text>
+  <rect x="1002" y="386" width="82" height="27" rx="4" fill="#50624b" opacity=".18"/>
+  <rect x="1094" y="386" width="92" height="27" rx="4" fill="#426a75" opacity=".18"/>
+  <rect x="1002" y="424" width="122" height="27" rx="4" fill="#9d6b53" opacity=".18"/>
+  <rect x="1134" y="424" width="72" height="27" rx="4" fill="#cf9b45" opacity=".18"/>
+</svg>

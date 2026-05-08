@@ -5,9 +5,17 @@
 :root {
   color-scheme: light;
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
   background: #f5f2ea;
   color: #23211d;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -23,6 +31,206 @@ body {
   margin: 0;
 }
 
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 a {
   color: inherit;
+}
+
+::selection {
+  background: #cf9b45;
+  color: #23211d;
+}
+
+@layer components {
+  .app-header {
+    @apply flex flex-wrap items-center justify-between gap-3 border-b border-ink/10 pb-3;
+  }
+
+  .tool-panel {
+    @apply rounded-lg border border-ink/10 bg-shell p-4 shadow-sm transition;
+  }
+
+  .toolbar {
+    @apply flex flex-wrap items-center gap-2 rounded-lg border border-ink/10 bg-shell p-2 shadow-sm;
+  }
+
+  .input-shell {
+    @apply flex h-10 items-center gap-2 rounded border border-ink/10 bg-paper px-3;
+  }
+
+  .input-shell input {
+    @apply min-w-0 flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-graphite/70;
+  }
+
+  .button-primary,
+  .button-secondary,
+  .link-button,
+  .icon-button {
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded border px-3 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-saffron;
+  }
+
+  .button-primary {
+    @apply border-ink bg-ink text-paper hover:bg-graphite;
+  }
+
+  .button-secondary,
+  .link-button,
+  .icon-button {
+    @apply border-ink/15 bg-paper text-ink hover:bg-saffron/20;
+  }
+
+  .icon-button {
+    @apply w-10 px-0;
+  }
+
+  .version-pill {
+    @apply inline-flex h-10 items-center rounded bg-moss px-3 text-xs font-bold uppercase text-paper;
+  }
+
+  .segmented {
+    @apply inline-flex h-10 overflow-hidden rounded border border-ink/15 bg-paper;
+  }
+
+  .segmented button {
+    @apply grid w-10 place-items-center border-r border-ink/10 text-graphite transition last:border-r-0 hover:bg-saffron/20;
+  }
+
+  .segmented button.active {
+    @apply bg-ink text-paper;
+  }
+
+  .toggle {
+    @apply h-5 w-9 appearance-none rounded-full bg-ink/20 transition checked:bg-moss;
+    position: relative;
+  }
+
+  .toggle::after {
+    content: '';
+    @apply absolute left-0.5 top-0.5 size-4 rounded-full bg-shell transition;
+  }
+
+  .toggle:checked::after {
+    transform: translateX(1rem);
+  }
+
+  .mood-board {
+    @apply min-h-[640px] rounded-lg border border-ink/10 bg-[linear-gradient(#eee8da_1px,transparent_1px),linear-gradient(90deg,#eee8da_1px,transparent_1px)] bg-[size:28px_28px] p-3 shadow-board;
+  }
+
+  .mood-board-masonry {
+    column-count: 1;
+    column-gap: 1rem;
+  }
+
+  .mood-board-spectrum,
+  .mood-board-contact {
+    @apply grid auto-rows-max grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3;
+  }
+
+  .image-card {
+    @apply relative mb-4 inline-block w-full break-inside-avoid overflow-hidden rounded-lg border border-ink/10 bg-shell align-top shadow-sm transition hover:-translate-y-0.5 hover:shadow-md;
+  }
+
+  .image-card.active {
+    @apply border-saffron ring-2 ring-saffron/40;
+  }
+
+  .image-card img {
+    @apply block w-full bg-ink/5 object-cover;
+  }
+
+  .remove-button {
+    @apply absolute right-2 top-2 z-10 grid size-8 place-items-center rounded bg-ink/85 text-paper opacity-0 transition hover:bg-clay;
+  }
+
+  .image-card:hover .remove-button,
+  .image-card:focus-within .remove-button {
+    @apply opacity-100;
+  }
+
+  .palette-bar {
+    @apply flex w-full overflow-hidden border-y border-ink/10;
+  }
+
+  .tag,
+  .tag-filter {
+    @apply inline-flex items-center rounded border px-2 py-1 text-[11px] font-bold uppercase;
+  }
+
+  .tag {
+    @apply border-ink/10 bg-paper text-graphite;
+  }
+
+  .tag-clip,
+  .tag-demo {
+    @apply border-moss/20 bg-moss/10 text-moss;
+  }
+
+  .tag-palette {
+    @apply border-clay/20 bg-clay/10 text-clay;
+  }
+
+  .tag-shape,
+  .tag-filename {
+    @apply border-tide/20 bg-tide/10 text-tide;
+  }
+
+  .tag-filter {
+    @apply gap-1.5 border-ink/10 bg-paper text-ink transition hover:bg-saffron/20;
+  }
+
+  .tag-filter span {
+    @apply rounded bg-ink/10 px-1 text-[10px];
+  }
+
+  .tag-filter.active {
+    @apply border-ink bg-ink text-paper;
+  }
+
+  .tag-filter.active span {
+    @apply bg-paper/20;
+  }
+
+  .empty-board {
+    @apply grid min-h-[640px] place-items-center rounded-lg border border-dashed border-ink/20 bg-shell p-8 text-center shadow-sm;
+  }
+
+  .toast {
+    @apply fixed bottom-4 left-1/2 z-50 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded border border-ink/15 bg-ink px-4 py-3 text-sm font-semibold text-paper shadow-board;
+  }
+
+  .toast button {
+    @apply grid size-7 place-items-center rounded hover:bg-paper/10;
+  }
+}
+
+@media (min-width: 700px) {
+  .mood-board-masonry {
+    column-count: 2;
+  }
+}
+
+@media (min-width: 1180px) {
+  .mood-board-masonry {
+    column-count: 3;
+  }
+}
+
+@media (min-width: 1480px) {
+  .mood-board-masonry {
+    column-count: 4;
+  }
 }

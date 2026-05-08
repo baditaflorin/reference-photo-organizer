@@ -24,6 +24,8 @@ dist/
 dist-data/
 coverage/
 tmp/
+test-results/
+playwright-report/
 *.log
 
 # Go

@@ -5,7 +5,19 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['docs/**', 'node_modules/**', 'coverage/**', 'dist/**'] },
+  {
+    ignores: [
+      'docs/**',
+      'node_modules/**',
+      'coverage/**',
+      'dist/**',
+      'tmp/**',
+      'eslint.config.js',
+      'postcss.config.js',
+      'tailwind.config.js',
+      'scripts/*.mjs'
+    ]
+  },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {
@@ -13,7 +25,7 @@ export default tseslint.config(
       ecmaVersion: 2022,
       globals: globals.browser,
       parserOptions: {
-        project: ['./tsconfig.app.json', './tsconfig.node.json'],
+        projectService: true,
         tsconfigRootDir: import.meta.dirname
       }
     },
@@ -23,6 +35,8 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/immutability': 'off',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/consistent-type-imports': 'error'

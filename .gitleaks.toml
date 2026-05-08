@@ -1,0 +1,6 @@
+[allowlist]
+description = "Generated browser ML bundles can contain tokenizer field names that look like generic keys."
+paths = [
+  '''docs/assets/clip\.worker-.*\.js$''',
+  '''tmp/.*'''
+]
