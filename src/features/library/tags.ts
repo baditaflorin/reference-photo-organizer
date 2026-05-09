@@ -117,7 +117,3 @@ export function dedupeTags(tags: ImageTag[]) {
 export function mergeTags(base: ImageTag[], incoming: ImageTag[], max = 10) {
   return dedupeTags([...incoming, ...base]).slice(0, max);
 }
-
-export function tagMatches(tag: ImageTag, query: string) {
-  return tag.label.toLowerCase().includes(query.toLowerCase());
-}

@@ -1,32 +1,126 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
+import { boardSummaryText } from '../export/metadata';
+import { downloadBlob } from '../export/download';
 import { classifyImageWithClip } from './clipClient';
 import { createDemoAssets } from './demoImages';
-import { createAssetFromFile } from './imageProcessing';
+import { importAssetBatch } from './importWorkflow';
+import {
+  clearPersistedImages,
+  clearPersistedWorkspace,
+  loadPersistedImages,
+  loadWorkspaceMeta,
+  persistImage,
+  persistImages,
+  persistWorkspaceMeta
+} from './storage';
 import { mergeTags } from './tags';
-import { clearPersistedImages, loadPersistedImages, persistImage, persistImages } from './storage';
 import type { ImageAsset, ImportProgress } from './types';
+import { createDefaultWorkspaceMeta } from '../workspace/defaults';
+import { createImportIssue, importReportSummary } from '../workspace/reporting';
+import { createWorkspaceFile, createWorkspaceFileName, parseWorkspaceText } from '../workspace/serialization';
+import type {
+  ImportIssue,
+  ImportReport,
+  ImportSource,
+  WorkspaceImportResult,
+  WorkspaceMeta,
+  WorkspaceSettings,
+  WorkspaceViewState
+} from '../workspace/types';
 
 const clipDisabledByQuery = new URLSearchParams(window.location.search).get('clip') === '0';
 
-export function useImageLibrary() {
+type TextImportSource = Extract<ImportSource, 'paste' | 'clipboard' | 'state-text' | 'state-file'>;
+
+interface LibraryStatus {
+  tagged: number;
+  failed: number;
+  total: number;
+}
+
+export interface UseImageLibraryResult {
+  images: ImageAsset[];
+  workspaceMeta: WorkspaceMeta;
+  isImporting: boolean;
+  isTagging: boolean;
+  isReadingClipboard: boolean;
+  progress: ImportProgress | null;
+  notice: string | null;
+  setNotice: Dispatch<SetStateAction<string | null>>;
+  status: LibraryStatus;
+  importFiles: (files: File[], source?: ImportSource) => Promise<void>;
+  importFromUrl: (urlText: string) => Promise<void>;
+  importWorkspaceFile: (file: File) => Promise<void>;
+  importText: (text: string) => Promise<void>;
+  importFromText: (text: string, source?: TextImportSource) => Promise<void>;
+  readClipboard: () => Promise<void>;
+  handlePasteEvent: (event: ClipboardEvent) => Promise<void>;
+  loadDemo: () => Promise<void>;
+  retagWithClip: () => Promise<void>;
+  clearImages: () => Promise<void>;
+  factoryReset: () => Promise<void>;
+  removeImage: (id: string) => Promise<void>;
+  updateView: (patch: Partial<WorkspaceViewState>) => void;
+  updateSettings: (patch: Partial<WorkspaceSettings>) => void;
+  exportWorkspaceState: () => Promise<void>;
+  copyWorkspaceSummary: () => Promise<void>;
+}
+
+interface ClipboardReaderWithImages extends Clipboard {
+  read: () => Promise<ClipboardItem[]>;
+}
+
+function hasClipboardImageRead(clipboard: Clipboard): clipboard is ClipboardReaderWithImages {
+  return typeof (clipboard as Partial<ClipboardReaderWithImages>).read === 'function';
+}
+
+export function useImageLibrary(): UseImageLibraryResult {
   const [images, setImages] = useState<ImageAsset[]>([]);
+  const [workspaceMeta, setWorkspaceMeta] = useState<WorkspaceMeta>(() => {
+    const meta = createDefaultWorkspaceMeta();
+    return {
+      ...meta,
+      settings: {
+        ...meta.settings,
+        clipEnabled: !clipDisabledByQuery
+      }
+    };
+  });
   const [isImporting, setIsImporting] = useState(false);
   const [isTagging, setIsTagging] = useState(false);
-  const [clipEnabled, setClipEnabled] = useState(!clipDisabledByQuery);
+  const [isReadingClipboard, setIsReadingClipboard] = useState(false);
   const [progress, setProgress] = useState<ImportProgress | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const imageRef = useRef<ImageAsset[]>([]);
+  const metaRef = useRef<WorkspaceMeta>(workspaceMeta);
 
   useEffect(() => {
     imageRef.current = images;
   }, [images]);
 
   useEffect(() => {
+    metaRef.current = workspaceMeta;
+  }, [workspaceMeta]);
+
+  useEffect(() => {
     let active = true;
 
-    void loadPersistedImages()
-      .then((records) => {
-        if (active && records.length > 0) {
+    void Promise.all([loadPersistedImages(), loadWorkspaceMeta()])
+      .then(([records, meta]) => {
+        if (!active) {
+          return;
+        }
+
+        const restoredMeta = meta.settings.autoRestore
+          ? meta
+          : {
+              ...createDefaultWorkspaceMeta(),
+              settings: meta.settings
+            };
+        setWorkspaceMeta(restoredMeta);
+
+        if (meta.settings.autoRestore && records.length > 0) {
           setImages(records);
           setNotice(`Restored ${records.length} local image${records.length === 1 ? '' : 's'}.`);
         }
@@ -43,56 +137,342 @@ export function useImageLibrary() {
     };
   }, []);
 
-  const importFiles = useCallback(
-    async (files: File[]) => {
-      const uniqueImages = dedupeFiles(files);
-      if (uniqueImages.length === 0) {
-        setNotice('No image files found.');
-        return;
+  useEffect(() => {
+    void persistWorkspaceMeta(workspaceMeta);
+  }, [workspaceMeta]);
+
+  async function importFiles(files: File[], source: ImportSource = 'picker') {
+    if (files.length === 0) {
+      setNotice('No image files found.');
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const result = await importAssetBatch({
+        files,
+        source,
+        existingIds: new Set(imageRef.current.map((image) => image.id)),
+        onProgress: (processed, total, current) => {
+          setProgress({ processed, total, current });
+        }
+      });
+
+      if (result.assets.length > 0) {
+        imageRef.current = upsertImages(imageRef.current, result.assets);
+        setImages((current) => upsertImages(current, result.assets));
+        await persistImages(result.assets);
       }
 
-      setIsImporting(true);
-      setProgress({ total: uniqueImages.length, processed: 0 });
+      updateWorkspaceMeta({
+        lastImportReport: result.report
+      });
+      setNotice(importReportSummary(result.report));
 
-      const imported: ImageAsset[] = [];
-      try {
-        for (const [index, file] of uniqueImages.entries()) {
-          setProgress({ total: uniqueImages.length, processed: index, current: file.name });
-          const asset = await createAssetFromFile(file);
-          imported.push(asset);
-          imageRef.current = upsertImages(imageRef.current, [asset]);
-          setImages((current) => upsertImages(current, [asset]));
-          await persistImage(asset);
-        }
-
-        setProgress({ total: uniqueImages.length, processed: uniqueImages.length });
-        setNotice(`Imported ${uniqueImages.length} image${uniqueImages.length === 1 ? '' : 's'}.`);
-
-        if (clipEnabled) {
-          await tagAssets(imported);
-        }
-      } finally {
-        setIsImporting(false);
-        setProgress(null);
+      if (metaRef.current.settings.clipEnabled && result.assets.length > 0) {
+        await tagAssets(result.assets);
       }
-    },
-    [clipEnabled]
-  );
+    } finally {
+      setIsImporting(false);
+      setProgress(null);
+    }
+  }
 
-  const loadDemo = useCallback(async () => {
+  async function loadDemo() {
     setIsImporting(true);
     try {
       const demos = await createDemoAssets();
       imageRef.current = upsertImages(imageRef.current, demos);
       setImages((current) => upsertImages(current, demos));
       await persistImages(demos);
+
+      const report: ImportReport = {
+        source: 'demo' as const,
+        startedAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+        attempted: demos.length,
+        imported: demos.length,
+        duplicates: 0,
+        skipped: 0,
+        failed: 0,
+        issues: []
+      };
+
+      updateWorkspaceMeta({
+        lastImportReport: report
+      });
       setNotice('Demo board loaded.');
     } finally {
       setIsImporting(false);
     }
-  }, []);
+  }
 
-  const retagWithClip = useCallback(async () => {
+  async function importFromUrl(urlText: string) {
+    const value = urlText.trim();
+    if (value.length === 0) {
+      setNotice('Paste or type an image URL first.');
+      return;
+    }
+
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      const report = failedSingleIssueReport(
+        'url',
+        createImportIssue({
+          code: 'url-invalid',
+          severity: 'error',
+          source: 'url',
+          name: value,
+          message: 'That is not a valid URL.',
+          nextStep: 'Paste a direct image URL that starts with http:// or https://.'
+        })
+      );
+      updateWorkspaceMeta({ lastImportReport: report });
+      setNotice(report.issues[0].message);
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        throw new Error(String(response.status));
+      }
+
+      const contentType = response.headers.get('content-type') ?? '';
+      if (!contentType.startsWith('image/')) {
+        const report = failedSingleIssueReport(
+          'url',
+          createImportIssue({
+            code: 'url-unsupported',
+            severity: 'warning',
+            source: 'url',
+            name: url.toString(),
+            message: 'That URL did not return an image file.',
+            nextStep: 'Open the direct image itself, then paste or save it before importing.'
+          })
+        );
+        updateWorkspaceMeta({ lastImportReport: report });
+        setNotice(report.issues[0].message);
+        return;
+      }
+
+      const blob = await response.blob();
+      const name = decodeURIComponent(url.pathname.split('/').pop() || `reference-${Date.now()}.png`);
+      const file = new File([blob], name, { type: contentType, lastModified: Date.now() });
+      await importFiles([file], 'url');
+    } catch {
+      const report = failedSingleIssueReport(
+        'url',
+        createImportIssue({
+          code: 'url-fetch-failed',
+          severity: 'error',
+          source: 'url',
+          name: value,
+          message: 'The browser could not download that image here.',
+          nextStep:
+            'If the site blocks browser downloads, save the image locally and use upload or paste instead.'
+        })
+      );
+      updateWorkspaceMeta({ lastImportReport: report });
+      setNotice(report.issues[0].message);
+    } finally {
+      setIsImporting(false);
+      setProgress(null);
+    }
+  }
+
+  async function importWorkspaceFile(file: File) {
+    const text = await file.text();
+    await importFromText(text, 'state-file');
+  }
+
+  async function importText(text: string): Promise<void> {
+    await importFromText(text, 'paste');
+  }
+
+  async function importFromText(text: string, source: TextImportSource = 'paste'): Promise<void> {
+    const trimmed = text.trim();
+    if (trimmed.length === 0) {
+      setNotice('The pasted content was empty.');
+      return;
+    }
+
+    if (trimmed.startsWith('{')) {
+      try {
+        const workspace = parseWorkspaceText(trimmed);
+        await replaceWorkspace(
+          workspace.images.map((image) => hydrateImportedImage(image)),
+          {
+            ...workspace.meta,
+            lastImportReport:
+              workspace.meta.lastImportReport ??
+              failedSingleIssueReport(
+                source,
+                createImportIssue({
+                  code: 'state-invalid',
+                  severity: 'info',
+                  source,
+                  name: 'workspace',
+                  message: 'Workspace imported.',
+                  nextStep: 'Your board is ready to review.'
+                })
+              )
+          }
+        );
+        setNotice(
+          `Workspace imported (${workspace.images.length} image${workspace.images.length === 1 ? '' : 's'}).`
+        );
+      } catch {
+        const report = failedSingleIssueReport(
+          source,
+          createImportIssue({
+            code: 'state-invalid',
+            severity: 'error',
+            source,
+            name: 'workspace',
+            message: 'That text was not a valid Reference Photo Organizer workspace file.',
+            nextStep: 'Paste a workspace JSON export or use the image URL field instead.'
+          })
+        );
+        updateWorkspaceMeta({ lastImportReport: report });
+        setNotice(report.issues[0].message);
+      }
+      return;
+    }
+
+    await importFromUrl(trimmed);
+  }
+
+  async function readClipboard() {
+    if (!navigator.clipboard) {
+      const report = failedSingleIssueReport(
+        'clipboard',
+        createImportIssue({
+          code: 'clipboard-permission',
+          severity: 'warning',
+          source: 'clipboard',
+          name: 'clipboard',
+          message: 'This browser does not expose clipboard import here.',
+          nextStep: 'Use paste, drag and drop, or the file picker instead.'
+        })
+      );
+      updateWorkspaceMeta({ lastImportReport: report });
+      setNotice(report.issues[0].message);
+      return;
+    }
+
+    setIsReadingClipboard(true);
+    try {
+      if (hasClipboardImageRead(navigator.clipboard)) {
+        const items = await navigator.clipboard.read();
+        const files: File[] = [];
+
+        for (const item of items) {
+          const imageType = item.types.find((type) => type.startsWith('image/'));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            files.push(
+              new File([blob], `clipboard-${Date.now()}.${extensionForType(imageType)}`, { type: imageType })
+            );
+          }
+        }
+
+        if (files.length > 0) {
+          await importFiles(files, 'clipboard');
+          return;
+        }
+      }
+
+      const text = await navigator.clipboard.readText();
+      if (text.trim().length > 0) {
+        await importFromText(text, 'clipboard');
+        return;
+      }
+
+      const report = failedSingleIssueReport(
+        'clipboard',
+        createImportIssue({
+          code: 'clipboard-empty',
+          severity: 'warning',
+          source: 'clipboard',
+          name: 'clipboard',
+          message: 'The clipboard did not contain an image or workspace text.',
+          nextStep: 'Copy an image, an image URL, or a workspace JSON export, then try again.'
+        })
+      );
+      updateWorkspaceMeta({ lastImportReport: report });
+      setNotice(report.issues[0].message);
+    } catch {
+      const report = failedSingleIssueReport(
+        'clipboard',
+        createImportIssue({
+          code: 'clipboard-permission',
+          severity: 'error',
+          source: 'clipboard',
+          name: 'clipboard',
+          message: 'Clipboard access was blocked by the browser.',
+          nextStep: 'Allow clipboard access, or use paste, drag and drop, or the file picker instead.'
+        })
+      );
+      updateWorkspaceMeta({ lastImportReport: report });
+      setNotice(report.issues[0].message);
+    } finally {
+      setIsReadingClipboard(false);
+    }
+  }
+
+  async function handlePasteEvent(event: ClipboardEvent): Promise<void> {
+    const files = [...(event.clipboardData?.files ?? [])].filter((file) => file.type.startsWith('image/'));
+    if (files.length > 0) {
+      event.preventDefault();
+      await importFiles(files, 'paste');
+      return;
+    }
+
+    const text = event.clipboardData?.getData('text/plain') ?? '';
+    if (text.trim().length > 0) {
+      event.preventDefault();
+      await importFromText(text, 'paste');
+    }
+  }
+
+  async function exportWorkspaceState(): Promise<void> {
+    const workspaceFile = await createWorkspaceFile(imageRef.current, metaRef.current);
+    const payload = JSON.stringify(workspaceFile, null, 2);
+    downloadBlob(new Blob([payload], { type: 'application/json' }), createWorkspaceFileName(metaRef.current));
+    setNotice('Workspace file exported.');
+  }
+
+  async function copyWorkspaceSummary(): Promise<void> {
+    const summary = boardSummaryText(
+      metaRef.current,
+      metaRef.current.lastImportReport,
+      imageRef.current.length
+    );
+    try {
+      await navigator.clipboard.writeText(summary);
+      setNotice('Board summary copied.');
+    } catch {
+      const report = failedSingleIssueReport(
+        'clipboard',
+        createImportIssue({
+          code: 'clipboard-permission',
+          severity: 'warning',
+          source: 'clipboard',
+          name: 'clipboard',
+          message: 'The browser blocked copying the board summary.',
+          nextStep: 'Allow clipboard access for this site, then try Copy summary again.'
+        })
+      );
+      updateWorkspaceMeta({ lastImportReport: report });
+      setNotice(report.issues[0].message);
+    }
+  }
+
+  async function retagWithClip(): Promise<void> {
     const candidates = imageRef.current;
     if (candidates.length === 0) {
       setNotice('Import images before CLIP tagging.');
@@ -100,17 +480,36 @@ export function useImageLibrary() {
     }
 
     await tagAssets(candidates);
-  }, []);
+  }
 
-  const clearImages = useCallback(async () => {
+  async function clearImages(): Promise<void> {
     imageRef.current.forEach((image) => URL.revokeObjectURL(image.url));
     imageRef.current = [];
     setImages([]);
     await clearPersistedImages();
-    setNotice('Local library cleared.');
-  }, []);
+    updateWorkspaceMeta({
+      view: {
+        ...metaRef.current.view,
+        searchQuery: '',
+        activeTag: '',
+        activeImageId: null
+      },
+      lastImportReport: null
+    });
+    setNotice('Workspace images cleared.');
+  }
 
-  const removeImage = useCallback(async (id: string) => {
+  async function factoryReset(): Promise<void> {
+    imageRef.current.forEach((image) => URL.revokeObjectURL(image.url));
+    imageRef.current = [];
+    setImages([]);
+    const resetMeta = createDefaultWorkspaceMeta();
+    setWorkspaceMeta(resetMeta);
+    await Promise.all([clearPersistedImages(), clearPersistedWorkspace()]);
+    setNotice('Workspace reset. Local images and settings were cleared.');
+  }
+
+  async function removeImage(id: string): Promise<void> {
     const remaining = imageRef.current.filter((image) => image.id !== id);
     const removed = imageRef.current.find((image) => image.id === id);
     if (removed) {
@@ -121,15 +520,71 @@ export function useImageLibrary() {
     await persistImages(remaining);
     imageRef.current = remaining;
     setImages(remaining);
-  }, []);
 
-  const status = useMemo(() => {
-    const tagged = images.filter((image) => image.clipStatus === 'tagged').length;
-    const failed = images.filter((image) => image.clipStatus === 'failed').length;
-    return { tagged, failed, total: images.length };
-  }, [images]);
+    updateWorkspaceMeta({
+      view: {
+        ...metaRef.current.view,
+        activeImageId:
+          metaRef.current.view.activeImageId === id
+            ? (remaining[0]?.id ?? null)
+            : metaRef.current.view.activeImageId
+      }
+    });
+  }
 
-  async function tagAssets(assets: ImageAsset[]) {
+  function updateView(patch: Partial<WorkspaceViewState>): void {
+    updateWorkspaceMeta({
+      view: {
+        ...metaRef.current.view,
+        ...patch
+      }
+    });
+  }
+
+  function updateSettings(patch: Partial<WorkspaceSettings>): void {
+    updateWorkspaceMeta({
+      settings: {
+        ...metaRef.current.settings,
+        ...patch
+      }
+    });
+  }
+
+  const status: LibraryStatus = {
+    tagged: images.filter((image) => image.clipStatus === 'tagged').length,
+    failed: images.filter((image) => image.clipStatus === 'failed').length,
+    total: images.length
+  };
+
+  return {
+    images,
+    workspaceMeta,
+    isImporting,
+    isTagging,
+    isReadingClipboard,
+    progress,
+    notice,
+    setNotice,
+    status,
+    importFiles,
+    importFromUrl,
+    importWorkspaceFile,
+    importText,
+    importFromText,
+    readClipboard,
+    handlePasteEvent,
+    loadDemo,
+    retagWithClip,
+    clearImages,
+    factoryReset,
+    removeImage,
+    updateView,
+    updateSettings,
+    exportWorkspaceState,
+    copyWorkspaceSummary
+  };
+
+  async function tagAssets(assets: ImageAsset[]): Promise<void> {
     setIsTagging(true);
     try {
       for (const asset of assets) {
@@ -161,37 +616,53 @@ export function useImageLibrary() {
     }
   }
 
+  async function replaceWorkspace(nextImages: ImageAsset[], nextMeta: WorkspaceMeta): Promise<void> {
+    imageRef.current.forEach((image) => URL.revokeObjectURL(image.url));
+    imageRef.current = nextImages;
+    setImages(nextImages);
+    setWorkspaceMeta(nextMeta);
+    await clearPersistedImages();
+    await persistImages(nextImages);
+    await persistWorkspaceMeta(nextMeta);
+  }
+
+  function updateWorkspaceMeta(patch: Partial<WorkspaceMeta>): void {
+    const nextMeta: WorkspaceMeta = {
+      ...metaRef.current,
+      ...patch,
+      settings: patch.settings ?? metaRef.current.settings,
+      view: patch.view ?? metaRef.current.view,
+      updatedAt: new Date().toISOString()
+    };
+    metaRef.current = nextMeta;
+    setWorkspaceMeta(nextMeta);
+  }
+}
+
+function hydrateImportedImage(image: WorkspaceImportResult['images'][number]): ImageAsset {
   return {
-    images,
-    isImporting,
-    isTagging,
-    clipEnabled,
-    setClipEnabled,
-    progress,
-    notice,
-    setNotice,
-    status,
-    importFiles,
-    loadDemo,
-    retagWithClip,
-    clearImages,
-    removeImage
+    id: image.id,
+    name: image.name,
+    path: image.path,
+    type: image.type,
+    size: image.size,
+    lastModified: image.lastModified,
+    importedAt: image.importedAt,
+    width: image.width,
+    height: image.height,
+    palette: image.palette,
+    tags: image.tags,
+    clipStatus: image.clipStatus,
+    blob: image.blob,
+    url: URL.createObjectURL(image.blob)
   };
 }
 
-function dedupeFiles(files: File[]) {
-  const seen = new Set<string>();
-  return files.filter((file) => {
-    const key = `${file.name}:${file.size}:${file.lastModified}`;
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  });
+function patchImage(current: ImageAsset[], id: string, patch: Partial<ImageAsset>): ImageAsset[] {
+  return current.map((image) => (image.id === id ? { ...image, ...patch } : image));
 }
 
-function upsertImages(current: ImageAsset[], incoming: ImageAsset[]) {
+function upsertImages(current: ImageAsset[], incoming: ImageAsset[]): ImageAsset[] {
   const byId = new Map(current.map((image) => [image.id, image]));
   for (const image of incoming) {
     const previous = byId.get(image.id);
@@ -204,6 +675,26 @@ function upsertImages(current: ImageAsset[], incoming: ImageAsset[]) {
   return [...byId.values()];
 }
 
-function patchImage(current: ImageAsset[], id: string, patch: Partial<ImageAsset>) {
-  return current.map((image) => (image.id === id ? { ...image, ...patch } : image));
+function failedSingleIssueReport(source: ImportSource, issue: ImportIssue): ImportReport {
+  return {
+    source,
+    startedAt: new Date().toISOString(),
+    completedAt: new Date().toISOString(),
+    attempted: 1,
+    imported: 0,
+    duplicates: 0,
+    skipped: issue.severity === 'warning' ? 1 : 0,
+    failed: issue.severity === 'error' ? 1 : 0,
+    issues: [issue]
+  };
+}
+
+function extensionForType(type: string): string {
+  if (type === 'image/jpeg') {
+    return 'jpg';
+  }
+  if (type === 'image/svg+xml') {
+    return 'svg';
+  }
+  return type.split('/')[1] || 'png';
 }

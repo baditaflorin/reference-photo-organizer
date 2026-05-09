@@ -4,7 +4,7 @@ import { deriveFallbackTags } from './tags';
 import type { ColorSwatch, ImageAsset } from './types';
 
 export async function createAssetFromFile(file: File): Promise<ImageAsset> {
-  const path = (file as File & { webkitRelativePath: string }).webkitRelativePath || file.name;
+  const path = describeFilePath(file);
   const id = await createStableId(path, file.size, file.lastModified);
   const url = URL.createObjectURL(file);
   const { width, height } = await readImageDimensions(url);
@@ -36,6 +36,14 @@ export async function createStableId(path: string, size: number, lastModified: n
     .slice(0, 12)
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
+}
+
+export function describeFilePath(file: File) {
+  return file.webkitRelativePath || file.name;
+}
+
+export function fileIdentityKey(file: File) {
+  return `${describeFilePath(file)}:${file.size}:${file.lastModified}`;
 }
 
 export async function readImageDimensions(url: string): Promise<{ width: number; height: number }> {
@@ -182,6 +190,19 @@ export function blobToDataUrl(blob: Blob) {
     reader.onerror = () => reject(reader.error ?? new Error('File could not be read.'));
     reader.readAsDataURL(blob);
   });
+}
+
+export function dataUrlToBlob(dataUrl: string, mimeType?: string) {
+  const [header, content] = dataUrl.split(',', 2);
+  const matchedMime = /data:([^;]+)/.exec(header)?.[1] ?? mimeType ?? 'application/octet-stream';
+  const binary = atob(content);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return new Blob([bytes], { type: matchedMime });
 }
 
 function defaultPalette(): ColorSwatch[] {

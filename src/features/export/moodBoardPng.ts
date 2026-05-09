@@ -1,5 +1,6 @@
 import { drawImageCover, loadImage } from '../library/imageProcessing';
 import type { ExportOptions, ImageAsset } from '../library/types';
+import { exportFooterLabel, exportSubtitle } from './metadata';
 
 const BOARD_WIDTH = 1800;
 const GAP = 24;
@@ -41,11 +42,15 @@ export async function createMoodBoardPng(images: ImageAsset[], options: ExportOp
   context.fillText(options.title || 'Reference Photo Organizer', PADDING, 70);
   context.font = '500 22px system-ui, sans-serif';
   context.fillStyle = '#5b554b';
-  context.fillText(`${images.length} references - palettes and tags`, PADDING, 110);
+  context.fillText(exportSubtitle(images.length), PADDING, 110);
 
   for (const item of laidOut) {
     drawTile(context, item.asset, item.image, item.x, item.y, item.width, item.height, options.showLabels);
   }
+
+  context.font = '500 16px system-ui, sans-serif';
+  context.fillStyle = '#5b554b';
+  context.fillText(exportFooterLabel(), PADDING, canvas.height - 24);
 
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => {

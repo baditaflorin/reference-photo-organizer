@@ -52,3 +52,8 @@ export interface ExportOptions {
   title: string;
   showLabels: boolean;
 }
+
+export interface ImportableAsset {
+  asset: ImageAsset;
+  dedupeKey: string;
+}

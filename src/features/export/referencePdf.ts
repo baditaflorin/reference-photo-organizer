@@ -1,5 +1,6 @@
 import { imageToCanvasDataUrl } from '../library/imageProcessing';
 import type { ExportOptions, ImageAsset } from '../library/types';
+import { exportFooterLabel } from './metadata';
 import type { jsPDF as JsPdfConstructor } from 'jspdf';
 
 type PdfDocument = InstanceType<typeof JsPdfConstructor>;
@@ -55,7 +56,7 @@ function drawHeader(pdf: PdfDocument, title: string, pageWidth: number, margin: 
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(9);
   pdf.setTextColor('#5b554b');
-  pdf.text('Generated locally by Reference Photo Organizer', pageWidth - margin, margin + 6, {
+  pdf.text(exportFooterLabel(), pageWidth - margin, margin + 6, {
     align: 'right'
   });
 }

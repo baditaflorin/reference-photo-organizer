@@ -1,5 +1,6 @@
 import { ExternalLink, HeartHandshake, Star, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { APP_VERSION, COMMIT_SHA, PAYPAL_URL, REPOSITORY_URL } from './appMeta';
 import { Dropzone } from './components/Dropzone';
 import { Inspector } from './components/Inspector';
 import { MoodBoard } from './components/MoodBoard';
@@ -8,45 +9,70 @@ import { downloadBlob, safeFileName } from './features/export/download';
 import { createMoodBoardPng } from './features/export/moodBoardPng';
 import { createReferencePdf } from './features/export/referencePdf';
 import { collectTags, filterImages } from './features/library/filtering';
-import type { BoardFilters } from './features/library/types';
 import { useImageLibrary } from './features/library/useImageLibrary';
-
-declare const __APP_VERSION__: string;
-declare const __COMMIT_SHA__: string;
-declare const __REPOSITORY_URL__: string;
-declare const __PAYPAL_URL__: string;
 
 export default function App() {
   const {
     images,
+    workspaceMeta,
     isImporting,
     isTagging,
-    clipEnabled,
-    setClipEnabled,
+    isReadingClipboard,
     progress,
     notice,
     setNotice,
     status,
     importFiles,
+    importText,
+    importWorkspaceFile,
+    readClipboard,
+    handlePasteEvent,
     loadDemo,
     retagWithClip,
     clearImages,
-    removeImage
+    factoryReset,
+    removeImage,
+    updateView,
+    updateSettings,
+    exportWorkspaceState,
+    copyWorkspaceSummary
   } = useImageLibrary();
-  const [filters, setFilters] = useState<BoardFilters>({ search: '', tag: '', layout: 'masonry' });
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [boardTitle, setBoardTitle] = useState('Artist reference board');
   const [isExporting, setIsExporting] = useState(false);
 
   const tags = useMemo(() => collectTags(images), [images]);
-  const filteredImages = useMemo(() => filterImages(images, filters), [images, filters]);
-  const activeImage = useMemo(
-    () => images.find((image) => image.id === activeId) ?? filteredImages[0] ?? images[0] ?? null,
-    [activeId, filteredImages, images]
+  const filteredImages = useMemo(
+    () =>
+      filterImages(images, {
+        search: workspaceMeta.view.searchQuery,
+        tag: workspaceMeta.view.activeTag,
+        layout: workspaceMeta.view.layout
+      }),
+    [images, workspaceMeta.view.activeTag, workspaceMeta.view.layout, workspaceMeta.view.searchQuery]
   );
-  const versionLine = useMemo(() => `v${__APP_VERSION__} / ${__COMMIT_SHA__}`, []);
+  const activeImage = useMemo(
+    () =>
+      images.find((image) => image.id === workspaceMeta.view.activeImageId) ??
+      filteredImages[0] ??
+      images[0] ??
+      null,
+    [filteredImages, images, workspaceMeta.view.activeImageId]
+  );
+  const versionLine = useMemo(() => `v${APP_VERSION} / ${COMMIT_SHA}`, []);
 
   const exportTargets = filteredImages.length > 0 ? filteredImages : images;
+
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      const target = event.target;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      void handlePasteEvent(event);
+    };
+
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [handlePasteEvent]);
 
   async function handleExportPng() {
     if (exportTargets.length === 0) {
@@ -55,8 +81,11 @@ export default function App() {
 
     setIsExporting(true);
     try {
-      const blob = await createMoodBoardPng(exportTargets, { title: boardTitle, showLabels: true });
-      downloadBlob(blob, `${safeFileName(boardTitle || 'mood-board')}.png`);
+      const blob = await createMoodBoardPng(exportTargets, {
+        title: workspaceMeta.view.boardTitle,
+        showLabels: workspaceMeta.settings.exportIncludeLabels
+      });
+      downloadBlob(blob, `${safeFileName(workspaceMeta.view.boardTitle || 'mood-board')}.png`);
       setNotice('PNG mood-board exported.');
     } catch {
       setNotice('PNG export failed.');
@@ -72,8 +101,11 @@ export default function App() {
 
     setIsExporting(true);
     try {
-      const blob = await createReferencePdf(exportTargets, { title: boardTitle, showLabels: true });
-      downloadBlob(blob, `${safeFileName(boardTitle || 'reference-sheet')}.pdf`);
+      const blob = await createReferencePdf(exportTargets, {
+        title: workspaceMeta.view.boardTitle,
+        showLabels: workspaceMeta.settings.exportIncludeLabels
+      });
+      downloadBlob(blob, `${safeFileName(workspaceMeta.view.boardTitle || 'reference-sheet')}.pdf`);
       setNotice('PDF reference sheet exported.');
     } catch {
       setNotice('PDF export failed.');
@@ -91,12 +123,12 @@ export default function App() {
             <h1 className="truncate text-2xl font-semibold sm:text-3xl">Artist reference workspace</h1>
           </div>
           <nav className="flex flex-wrap items-center gap-2 text-sm font-medium" aria-label="Project links">
-            <a className="link-button" href={__REPOSITORY_URL__} target="_blank" rel="noreferrer">
+            <a className="link-button" href={REPOSITORY_URL} target="_blank" rel="noreferrer">
               <Star className="size-4" />
               Star repo
               <ExternalLink className="size-3.5" />
             </a>
-            <a className="link-button" href={__PAYPAL_URL__} target="_blank" rel="noreferrer">
+            <a className="link-button" href={PAYPAL_URL} target="_blank" rel="noreferrer">
               <HeartHandshake className="size-4" />
               PayPal
               <ExternalLink className="size-3.5" />
@@ -108,24 +140,28 @@ export default function App() {
         <div className="grid flex-1 gap-4 py-4 lg:grid-cols-[300px_minmax(0,1fr)_300px]">
           <div className="space-y-4">
             <Dropzone
-              onFiles={importFiles}
+              onFiles={(files, source) => importFiles(files, source)}
               onDemo={loadDemo}
+              onReadClipboard={readClipboard}
+              onImportWorkspaceFile={importWorkspaceFile}
+              onImportText={importText}
               isImporting={isImporting}
               isTagging={isTagging}
+              isReadingClipboard={isReadingClipboard}
               progress={progress}
-              clipEnabled={clipEnabled}
-              onClipEnabledChange={setClipEnabled}
+              clipEnabled={workspaceMeta.settings.clipEnabled}
+              onClipEnabledChange={(enabled) => updateSettings({ clipEnabled: enabled })}
             />
           </div>
 
           <section className="min-w-0 space-y-4">
             <Toolbar
-              search={filters.search}
-              onSearchChange={(search) => setFilters((current) => ({ ...current, search }))}
-              layout={filters.layout}
-              onLayoutChange={(layout) => setFilters((current) => ({ ...current, layout }))}
-              title={boardTitle}
-              onTitleChange={setBoardTitle}
+              search={workspaceMeta.view.searchQuery}
+              onSearchChange={(search) => updateView({ searchQuery: search })}
+              layout={workspaceMeta.view.layout}
+              onLayoutChange={(layout) => updateView({ layout })}
+              title={workspaceMeta.view.boardTitle}
+              onTitleChange={(boardTitle) => updateView({ boardTitle })}
               canExport={exportTargets.length > 0}
               isExporting={isExporting}
               onExportPng={() => void handleExportPng()}
@@ -135,9 +171,9 @@ export default function App() {
             />
             <MoodBoard
               images={filteredImages}
-              layout={filters.layout}
+              layout={workspaceMeta.view.layout}
               activeId={activeImage?.id ?? null}
-              onActiveChange={setActiveId}
+              onActiveChange={(id) => updateView({ activeImageId: id })}
               onRemove={(id) => void removeImage(id)}
             />
           </section>
@@ -148,8 +184,14 @@ export default function App() {
             tagged={status.tagged}
             failed={status.failed}
             tags={tags}
-            activeTag={filters.tag}
-            onTagChange={(tag) => setFilters((current) => ({ ...current, tag }))}
+            activeTag={workspaceMeta.view.activeTag}
+            onTagChange={(activeTag) => updateView({ activeTag })}
+            report={workspaceMeta.lastImportReport}
+            settings={workspaceMeta.settings}
+            onSettingsChange={updateSettings}
+            onExportWorkspace={() => void exportWorkspaceState()}
+            onCopySummary={() => void copyWorkspaceSummary()}
+            onFactoryReset={() => void factoryReset()}
           />
         </div>
 

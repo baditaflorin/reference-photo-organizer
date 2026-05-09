@@ -1,0 +1,9 @@
+declare const __APP_VERSION__: string;
+declare const __COMMIT_SHA__: string;
+declare const __REPOSITORY_URL__: string;
+declare const __PAYPAL_URL__: string;
+
+export const APP_VERSION = __APP_VERSION__;
+export const COMMIT_SHA = __COMMIT_SHA__;
+export const REPOSITORY_URL = __REPOSITORY_URL__;
+export const PAYPAL_URL = __PAYPAL_URL__;

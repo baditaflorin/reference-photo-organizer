@@ -1,33 +1,54 @@
-import { FolderOpen, Images, Loader2, Sparkles } from 'lucide-react';
-import type React from 'react';
+import { ClipboardPaste, FolderOpen, Images, Link2, Loader2, Sparkles, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
+import type { InputHTMLAttributes } from 'react';
 import { filesFromDataTransfer, filesFromInput } from '../features/library/fileDrop';
 import type { ImportProgress } from '../features/library/types';
+import type { ImportSource } from '../features/workspace/types';
 
 interface DropzoneProps {
-  onFiles: (files: File[]) => Promise<void>;
+  onFiles: (files: File[], source?: ImportSource) => Promise<void>;
   onDemo: () => Promise<void>;
+  onReadClipboard: () => Promise<void>;
+  onImportWorkspaceFile: (file: File) => Promise<void>;
+  onImportText: (text: string) => Promise<void>;
   isImporting: boolean;
   isTagging: boolean;
+  isReadingClipboard: boolean;
   progress: ImportProgress | null;
   clipEnabled: boolean;
   onClipEnabledChange: (enabled: boolean) => void;
 }
 
+type DirectoryInputProps = InputHTMLAttributes<HTMLInputElement> & {
+  directory?: string;
+  webkitdirectory?: string;
+};
+
+const directoryInputProps: DirectoryInputProps = {
+  directory: '',
+  webkitdirectory: ''
+};
+
 export function Dropzone({
   onFiles,
   onDemo,
+  onReadClipboard,
+  onImportWorkspaceFile,
+  onImportText,
   isImporting,
   isTagging,
+  isReadingClipboard,
   progress,
   clipEnabled,
   onClipEnabledChange
 }: DropzoneProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
+  const workspaceInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [urlValue, setUrlValue] = useState('');
 
-  const busy = isImporting || isTagging;
+  const busy = isImporting || isTagging || isReadingClipboard;
 
   return (
     <section
@@ -40,7 +61,7 @@ export function Dropzone({
       onDrop={(event) => {
         event.preventDefault();
         setIsDragging(false);
-        void filesFromDataTransfer(event.dataTransfer).then(onFiles);
+        void filesFromDataTransfer(event.dataTransfer).then((files) => onFiles(files, 'drop'));
       }}
       aria-label="Image import"
     >
@@ -84,6 +105,40 @@ export function Dropzone({
           <Sparkles className="size-4" />
           Demo board
         </button>
+        <button className="button-secondary" type="button" onClick={() => void onReadClipboard()}>
+          <ClipboardPaste className="size-4" />
+          Clipboard
+        </button>
+        <button className="button-secondary" type="button" onClick={() => workspaceInputRef.current?.click()}>
+          <Upload className="size-4" />
+          Workspace
+        </button>
+      </div>
+      <p className="mt-2 text-xs text-graphite">
+        Folder import works best in Chromium and Safari. If a browser only offers single-file selection, use
+        <span className="font-medium"> Images</span> or drag and drop instead.
+      </p>
+
+      <div className="mt-4 space-y-2 rounded border border-ink/10 bg-paper p-3">
+        <label className="text-xs font-semibold uppercase tracking-[0.14em] text-graphite">
+          Image URL or pasted workspace text
+        </label>
+        <div className="flex gap-2">
+          <input
+            className="min-w-0 flex-1 rounded border border-ink/10 bg-shell px-3 py-2 text-sm outline-none"
+            value={urlValue}
+            onChange={(event) => setUrlValue(event.target.value)}
+            placeholder="https://example.com/reference.jpg"
+            aria-label="Image URL"
+          />
+          <button className="button-secondary" type="button" onClick={() => void onImportText(urlValue)}>
+            <Link2 className="size-4" />
+            Import
+          </button>
+        </div>
+        <p className="text-xs text-graphite">
+          Paste anywhere in the app to import a screenshot, image URL, or saved workspace JSON.
+        </p>
       </div>
 
       <label className="mt-4 flex items-center justify-between gap-3 rounded border border-ink/10 bg-paper px-3 py-2 text-sm">
@@ -105,7 +160,7 @@ export function Dropzone({
         type="file"
         accept="image/*"
         multiple
-        onChange={(event) => void onFiles(filesFromInput(event.target.files))}
+        onChange={(event) => void onFiles(filesFromInput(event.target.files), 'picker')}
       />
       <input
         ref={folderInputRef}
@@ -113,8 +168,20 @@ export function Dropzone({
         type="file"
         accept="image/*"
         multiple
-        {...({ webkitdirectory: '', directory: '' } as React.InputHTMLAttributes<HTMLInputElement>)}
-        onChange={(event) => void onFiles(filesFromInput(event.target.files))}
+        {...directoryInputProps}
+        onChange={(event) => void onFiles(filesFromInput(event.target.files), 'folder')}
+      />
+      <input
+        ref={workspaceInputRef}
+        className="sr-only"
+        type="file"
+        accept=".json,application/json"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) {
+            void onImportWorkspaceFile(file);
+          }
+        }}
       />
     </section>
   );

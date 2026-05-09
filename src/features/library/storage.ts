@@ -1,10 +1,19 @@
+import { createDefaultWorkspaceMeta } from '../workspace/defaults';
+import type { WorkspaceMeta } from '../workspace/types';
 import type { ImageAsset, PersistedImageAsset } from './types';
 
 const DB_NAME = 'reference-photo-organizer';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const IMAGE_STORE = 'images';
+const META_STORE = 'workspace_meta';
+const META_KEY = 'workspace-meta';
 
-export async function openLibraryDb() {
+interface WorkspaceMetaRecord {
+  key: string;
+  value: WorkspaceMeta;
+}
+
+async function openLibraryDb(): Promise<IDBDatabase> {
   return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
@@ -12,6 +21,9 @@ export async function openLibraryDb() {
       const db = request.result;
       if (!db.objectStoreNames.contains(IMAGE_STORE)) {
         db.createObjectStore(IMAGE_STORE, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(META_STORE)) {
+        db.createObjectStore(META_STORE, { keyPath: 'key' });
       }
     };
 
@@ -22,11 +34,16 @@ export async function openLibraryDb() {
 
 export async function loadPersistedImages(): Promise<ImageAsset[]> {
   const db = await openLibraryDb();
-  const records = await transaction<PersistedImageAsset[]>(db, 'readonly', (store, resolve, reject) => {
-    const request = store.getAll();
-    request.onsuccess = () => resolve(request.result as PersistedImageAsset[]);
-    request.onerror = () => reject(request.error ?? new Error('Could not read image library.'));
-  });
+  const records = await transaction<PersistedImageAsset[]>(
+    db,
+    'readonly',
+    IMAGE_STORE,
+    (store, resolve, reject) => {
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result as PersistedImageAsset[]);
+      request.onerror = () => reject(request.error ?? new Error('Could not read image library.'));
+    }
+  );
 
   return records
     .sort((a, b) => a.importedAt.localeCompare(b.importedAt))
@@ -36,7 +53,7 @@ export async function loadPersistedImages(): Promise<ImageAsset[]> {
 export async function persistImage(asset: ImageAsset) {
   const db = await openLibraryDb();
   const record: PersistedImageAsset = stripObjectUrl(asset);
-  await transaction(db, 'readwrite', (store, resolve, reject) => {
+  await transaction(db, 'readwrite', IMAGE_STORE, (store, resolve, reject) => {
     const request = store.put(record);
     request.onsuccess = () => resolve(undefined);
     request.onerror = () => reject(request.error ?? new Error('Could not persist image.'));
@@ -49,10 +66,44 @@ export async function persistImages(assets: ImageAsset[]) {
 
 export async function clearPersistedImages() {
   const db = await openLibraryDb();
-  await transaction(db, 'readwrite', (store, resolve, reject) => {
+  await transaction(db, 'readwrite', IMAGE_STORE, (store, resolve, reject) => {
     const request = store.clear();
     request.onsuccess = () => resolve(undefined);
     request.onerror = () => reject(request.error ?? new Error('Could not clear image library.'));
+  });
+}
+
+export async function loadWorkspaceMeta(): Promise<WorkspaceMeta> {
+  const db = await openLibraryDb();
+  const record = await transaction<WorkspaceMetaRecord | null>(
+    db,
+    'readonly',
+    META_STORE,
+    (store, resolve, reject) => {
+      const request = store.get(META_KEY);
+      request.onsuccess = () => resolve((request.result as WorkspaceMetaRecord | undefined) ?? null);
+      request.onerror = () => reject(request.error ?? new Error('Could not read workspace settings.'));
+    }
+  );
+
+  return record?.value ?? createDefaultWorkspaceMeta();
+}
+
+export async function persistWorkspaceMeta(meta: WorkspaceMeta) {
+  const db = await openLibraryDb();
+  await transaction(db, 'readwrite', META_STORE, (store, resolve, reject) => {
+    const request = store.put({ key: META_KEY, value: meta });
+    request.onsuccess = () => resolve(undefined);
+    request.onerror = () => reject(request.error ?? new Error('Could not persist workspace settings.'));
+  });
+}
+
+export async function clearPersistedWorkspace() {
+  const db = await openLibraryDb();
+  await transaction(db, 'readwrite', META_STORE, (store, resolve, reject) => {
+    const request = store.delete(META_KEY);
+    request.onsuccess = () => resolve(undefined);
+    request.onerror = () => reject(request.error ?? new Error('Could not clear workspace settings.'));
   });
 }
 
@@ -65,6 +116,7 @@ function stripObjectUrl(asset: ImageAsset): PersistedImageAsset {
 function transaction<T>(
   db: IDBDatabase,
   mode: IDBTransactionMode,
+  storeName: string,
   run: (
     store: IDBObjectStore,
     resolve: (value: T | PromiseLike<T>) => void,
@@ -72,8 +124,8 @@ function transaction<T>(
   ) => void
 ) {
   return new Promise<T>((resolve, reject) => {
-    const tx = db.transaction(IMAGE_STORE, mode);
-    const store = tx.objectStore(IMAGE_STORE);
+    const tx = db.transaction(storeName, mode);
+    const store = tx.objectStore(storeName);
     run(store, resolve, reject);
   });
 }

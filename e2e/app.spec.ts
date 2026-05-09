@@ -25,4 +25,9 @@ test('imports an image and exports a mood-board PNG', async ({ page }) => {
   await pngButton.click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/artist-reference-board.*\.png/);
+
+  const workspaceDownloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save workspace' }).click();
+  const workspaceDownload = await workspaceDownloadPromise;
+  expect(workspaceDownload.suggestedFilename()).toMatch(/artist-reference-board-workspace\.json/);
 });
