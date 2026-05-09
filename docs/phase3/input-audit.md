@@ -11,37 +11,35 @@ Status legend:
 - `red`: claimed by UI or implied by workflow, but not built end-to-end
 - `gray`: not currently built and not yet claimed
 
-| Input pathway                           | Status   | Current behavior                                             | Gaps                                                                           |
-| --------------------------------------- | -------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| File picker: multi-image                | `green`  | Imports supported image files from local picker              | No per-file skip ledger                                                        |
-| Folder picker                           | `yellow` | Imports image folders with `webkitdirectory` where supported | Browser-dependent, no unsupported-browser fallback copy                        |
-| Drag and drop files                     | `green`  | Imports dropped images                                       | No per-file skip ledger                                                        |
-| Drag and drop folders                   | `yellow` | Uses `webkitGetAsEntry` traversal when available             | Browser-dependent, fallback is weak                                            |
-| Demo/sample loader                      | `green`  | Demo board loads and persists                                | No distinction between demo and user workspace                                 |
-| Restored autosave                       | `yellow` | Restores image blobs from IndexedDB                          | Board title, filters, layout, selected tag, and CLIP preference do not restore |
-| Start fresh                             | `yellow` | Clear library empties stored images                          | Does not clear non-image session state because that state is not persisted     |
-| Paste image from clipboard              | `red`    | Not supported                                                | Common artist workflow missing                                                 |
-| Paste image URL or state JSON           | `red`    | Not supported                                                | No paste surface at all                                                        |
-| Clipboard read button                   | `red`    | Not supported                                                | No permission-aware clipboard import                                           |
-| URL import                              | `red`    | Not supported                                                | No browser fetch route or CORS guidance                                        |
-| Import saved app state                  | `red`    | Not supported                                                | No downloadable workspace file to re-import                                    |
-| Deep link / share link restore          | `gray`   | Not built                                                    | Local-first constraints need an explicit policy                                |
-| Mobile picker                           | `yellow` | Native file input should work on mobile browsers             | Not documented or tested; no mobile-specific copy                              |
-| Multi-file progress and partial success | `yellow` | Batch progress exists                                        | One bad file can stop the whole import                                         |
-| Unsupported format handling             | `red`    | Browser decode failure bubbles up poorly                     | No artist-language explanation or skip summary                                 |
-| Corrupted file handling                 | `red`    | A bad image can break the batch                              | No isolate-and-continue behavior                                               |
+| Input pathway                           | Status   | Current behavior                                                               | Gaps                                                                                    |
+| --------------------------------------- | -------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| File picker: multi-image                | `green`  | Imports supported image files and keeps a per-file import report               | None in the current surface                                                             |
+| Folder picker                           | `yellow` | Imports folders where `webkitdirectory` exists and now explains fallback       | Browser support is still uneven across engines                                          |
+| Drag and drop files                     | `green`  | Imports dropped images with dedupe and per-file outcome reporting              | None in the current surface                                                             |
+| Drag and drop folders                   | `yellow` | Traverses dropped directories when `webkitGetAsEntry` exists                   | Browser support is still engine-dependent                                               |
+| Demo/sample loader                      | `green`  | Demo board loads through the same persistence and reporting flow               | None in the current surface                                                             |
+| Restored autosave                       | `green`  | Restores images, board title, layout, active tag, selected image, and settings | None in the current surface                                                             |
+| Start fresh                             | `green`  | `Clear library` clears images; `Factory reset` clears the full workspace       | None in the current surface                                                             |
+| Paste image from clipboard              | `green`  | Global paste imports copied screenshots and image files                        | Browser clipboard permissions can still block access, but the app explains that clearly |
+| Paste image URL or state JSON           | `green`  | Global paste and the text field route through the same import parser           | None in the current surface                                                             |
+| Clipboard read button                   | `green`  | Reads image clipboard items when allowed and falls back to text                | Browser permission prompts still vary by engine                                         |
+| URL import                              | `green`  | Imports direct image URLs and explains blocked/CORS cases                      | Cross-origin sites can still refuse browser fetches                                     |
+| Import saved app state                  | `green`  | Imports exported workspace JSON with image blobs and workspace metadata        | None in the current surface                                                             |
+| Deep link / share link restore          | `gray`   | Not built                                                                      | Explicitly out of scope for the local-first Pages mode                                  |
+| Mobile picker                           | `yellow` | Standard file inputs should work; workspace/file routes are the same           | Still not tested on a physical phone in this pass                                       |
+| Multi-file progress and partial success | `green`  | Shows progress, keeps good files, and reports duplicate/skipped/failed counts  | No cancel control yet for very large imports                                            |
+| Unsupported format handling             | `green`  | Skips known unsupported formats with artist-language next steps                | Browser-native decode gaps remain for some niche formats                                |
+| Corrupted file handling                 | `green`  | Isolates decode failures and continues the batch                               | None in the current surface                                                             |
 
 ## Summary
 
-- `green`: 4
-- `yellow`: 6
-- `red`: 6
+- `green`: 12
+- `yellow`: 3
+- `red`: 0
 - `gray`: 1
 
 ## Highest-risk gaps
 
-1. No paste or clipboard routes.
-2. No import of saved workspace state.
-3. No per-file resilience for corrupt or unsupported files.
-4. Restored autosave is incomplete because only images persist.
-5. URL import and its limitations are completely absent.
+1. Folder and dropped-folder support are still browser-dependent, even with clearer fallback guidance.
+2. Mobile picker behavior is still inferred rather than tested on a physical device.
+3. Very large imports show progress and partial success, but not cancellation yet.

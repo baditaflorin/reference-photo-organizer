@@ -6,13 +6,28 @@ Repository: https://github.com/baditaflorin/reference-photo-organizer
 
 Support: https://www.paypal.com/paypalme/florinbadita
 
-Browser-based artist reference board with local image tagging, palettes, collages, and PNG/PDF export.
+Browser-based artist reference board with local image tagging, palettes, workspace save/import, and PNG/PDF export.
 
 ![Reference Photo Organizer screenshot](public/demo-screenshot.svg)
 
 ## Why
 
-Reference Photo Organizer gives artists a local-first replacement for lightweight PureRef, Eagle, and Milanote reference workflows: drop an image folder, get palettes and content tags, arrange a board, and export a PNG mood-board or PDF reference sheet.
+Reference Photo Organizer gives artists a local-first replacement for lightweight PureRef, Eagle, and Milanote reference workflows: drop an image folder, get palettes and content tags, arrange a board, save the whole workspace, and export a PNG mood-board or PDF reference sheet.
+
+## What Works
+
+- Import images from folders, file picker, drag and drop, clipboard, direct image URLs, or saved workspace JSON
+- Keep working locally with IndexedDB restore for board title, layout, filters, settings, and imported images
+- Save and re-import a portable workspace file
+- Export PNG mood-boards, PDF reference sheets, and a clipboard-ready board summary
+- Show version and commit in the published header, plus GitHub and PayPal links
+
+## Limitations
+
+- Folder picking and dropped-folder traversal still depend on browser support
+- Direct URL import only works when the source site allows browser fetches
+- Share links and cloud sync are intentionally out of scope for the static local-first build
+- CLIP and fallback tags are both shown, but they do not yet have distinct confidence styling
 
 ## Quickstart
 
@@ -55,6 +70,8 @@ Privacy: docs/privacy.md
 ADRs: docs/adr/
 
 Postmortem: docs/postmortem.md
+
+Phase 3 postmortem: docs/postmortem-phase3.md
 
 ## Version
 
